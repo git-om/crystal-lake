@@ -12,6 +12,7 @@ import {
 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 import {
   BarChart,
@@ -24,6 +25,35 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+/** ✅ BEST MOBILE FIX:
+ *  - Use a bottom-sheet (Dialog) on mobile instead of Popover
+ *  - Keep Popover for desktop
+ *  - Prevent focus auto-scroll jump + blur active input on open
+ */
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia(query);
+
+    const onChange = () => setMatches(!!m.matches);
+    onChange();
+
+    // Safari < 14 fallback
+    if (m.addEventListener) m.addEventListener("change", onChange);
+    else m.addListener(onChange);
+
+    return () => {
+      if (m.removeEventListener) m.removeEventListener("change", onChange);
+      else m.removeListener(onChange);
+    };
+  }, [query]);
+
+  return matches;
+}
 
 function chicagoTodayISO() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -75,7 +105,6 @@ function toChicagoAxisDate(isoDate) {
 }
 
 function getChicagoWeekdayIndex(isoDate) {
-  // Get weekday index in Chicago reliably using Intl
   const d = new Date(`${isoDate}T00:00:00`);
   const weekdayShort = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Chicago",
@@ -121,6 +150,188 @@ function ChartCard({ title, subtitle, icon: Icon, children, footer }) {
   );
 }
 
+function DatePicker({
+  date,
+  setDate,
+  today,
+  todayDateObj,
+  usedDates,
+  selectedDateObj,
+  dateTaken,
+  isFuture,
+}) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [open, setOpen] = useState(false);
+
+  const TriggerButton = (
+    <button
+      type="button"
+      onClick={() => {
+        // ✅ Prevent mobile keyboard / viewport resize + weird jumps
+        if (document?.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        setOpen(true);
+      }}
+      className={[
+        "w-full h-[52px] rounded-2xl bg-zinc-800/50 backdrop-blur-xl border px-4",
+        "border-zinc-700/50 hover:bg-zinc-800/70 transition-all",
+        "focus:outline-none focus:ring-2 focus:ring-blue-500/30",
+        dateTaken || isFuture ? "border-amber-500/40" : "",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="grid place-items-center w-9 h-9 rounded-xl bg-zinc-900/40 border border-zinc-700/40 shrink-0">
+          <CalendarIcon className="h-4 w-4 text-zinc-200" />
+        </span>
+
+        <div className="flex flex-col items-start leading-tight min-w-0">
+          <span className="text-sm text-zinc-100 truncate w-full">{date}</span>
+          <span className="text-xs text-zinc-400 truncate w-full">{toChicagoDisplayDate(date)}</span>
+        </div>
+
+        <span className="ml-auto text-xs text-zinc-400 shrink-0">Pick</span>
+      </div>
+    </button>
+  );
+
+  const CalendarBody = (
+    <>
+      <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
+        <div className="text-xs text-zinc-300">Choose a date</div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setDate(today);
+            setOpen(false);
+          }}
+          className="px-3 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-medium hover:bg-zinc-200 transition"
+        >
+          Today
+        </button>
+      </div>
+
+      <Calendar
+        mode="single"
+        selected={selectedDateObj}
+        onSelect={(d) => {
+          if (!d) return;
+
+          const iso = isoFromDate(d);
+          if (d > todayDateObj) return;
+          if (usedDates.has(iso)) return;
+
+          setDate(iso);
+          setOpen(false);
+        }}
+        disabled={(d) => d > todayDateObj || usedDates.has(isoFromDate(d))}
+        className="p-3"
+        classNames={{
+          caption_label: "text-sm font-semibold text-zinc-100",
+          head_cell: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
+          day: "h-9 w-9 rounded-xl text-zinc-200 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30",
+          day_selected: "bg-blue-600 text-white hover:bg-blue-600 focus:bg-blue-600",
+          day_today: "border border-blue-500/50",
+          day_outside: "text-zinc-600 opacity-40",
+          day_disabled: "text-zinc-600 opacity-35",
+          nav_button:
+            "h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800",
+        }}
+      />
+    </>
+  );
+
+  // ✅ Mobile: bottom-sheet dialog (NO “popover jump” problem)
+  if (isMobile) {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (v) {
+            if (document?.activeElement instanceof HTMLElement) document.activeElement.blur();
+          }
+          setOpen(v);
+        }}
+      >
+        <DialogTrigger asChild>{TriggerButton}</DialogTrigger>
+
+        <DialogContent
+          className="
+            p-0
+            border border-zinc-700/60
+            bg-zinc-950/95
+            backdrop-blur-xl
+            shadow-2xl
+            rounded-3xl
+            w-[calc(100vw-1.25rem)]
+            max-w-[420px]
+            max-h-[calc(100dvh-1.25rem)]
+            overflow-hidden
+          "
+          // ✅ Avoid focus causing scroll-jumps on mobile
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div className="max-h-[calc(100dvh-1.25rem)] overflow-y-auto overscroll-contain">
+            {CalendarBody}
+          </div>
+
+          <div className="p-3 border-t border-zinc-800">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="w-full h-11 rounded-2xl bg-zinc-800/60 border border-zinc-700/50 text-zinc-100 text-sm font-medium hover:bg-zinc-800/80 transition"
+            >
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // ✅ Desktop: popover (safe settings)
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        if (v) {
+          if (document?.activeElement instanceof HTMLElement) document.activeElement.blur();
+        }
+        setOpen(v);
+      }}
+      modal
+    >
+      <PopoverTrigger asChild>{TriggerButton}</PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={10}
+        collisionPadding={16}
+        sticky="always"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="
+          z-[9999]
+          w-[min(360px,calc(100vw-2rem))]
+          p-0
+          overflow-hidden
+          rounded-2xl
+          border border-zinc-700/60
+          bg-zinc-950/95
+          shadow-2xl
+          backdrop-blur-xl
+          max-h-[calc(100dvh-120px)]
+        "
+      >
+        <div className="max-h-[calc(100dvh-120px)] overflow-y-auto overscroll-contain">
+          {CalendarBody}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function SalesPage() {
   const [me, setMe] = useState(null);
   const [sales, setSales] = useState([]);
@@ -141,8 +352,6 @@ export default function SalesPage() {
   const [adding, setAdding] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   // Mobile view switcher
   const [mobileView, setMobileView] = useState("graphs"); // "graphs" | "data"
@@ -217,7 +426,11 @@ export default function SalesPage() {
       .slice(0, 5)
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    return { year, countInYear: inYear.length, data: top.map((s) => ({ date: s.date, sale: Number(s.sale) || 0 })) };
+    return {
+      year,
+      countInYear: inYear.length,
+      data: top.map((s) => ({ date: s.date, sale: Number(s.sale) || 0 })),
+    };
   }, [salesAsc, today]);
 
   async function load() {
@@ -452,8 +665,8 @@ export default function SalesPage() {
           top5YearData.countInYear === 0
             ? "No entries found in this year — still data is too low."
             : top5YearData.data.length < 5
-            ? `Only ${top5YearData.data.length} day(s) available in ${top5YearData.year} — still data is too low for Top 5.`
-            : `Top 5 computed from ${top5YearData.countInYear} day(s) in ${top5YearData.year}`
+              ? `Only ${top5YearData.data.length} day(s) available in ${top5YearData.year} — still data is too low for Top 5.`
+              : `Top 5 computed from ${top5YearData.countInYear} day(s) in ${top5YearData.year}`
         }
       >
         <div className="h-[240px] rounded-2xl border border-zinc-700/50 bg-zinc-950/30 p-3">
@@ -690,12 +903,7 @@ export default function SalesPage() {
         <div className="flex items-start gap-3 mb-6">
           <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
           </div>
           <div className="min-w-0">
@@ -711,84 +919,16 @@ export default function SalesPage() {
           <div className="md:col-span-5">
             <label className="text-sm font-medium text-zinc-300 mb-2 block">Date (Chicago)</label>
 
-            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen} modal>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={[
-                    "w-full h-[52px] rounded-2xl bg-zinc-800/50 backdrop-blur-xl border px-4",
-                    "border-zinc-700/50 hover:bg-zinc-800/70 transition-all",
-                    "focus:outline-none focus:ring-2 focus:ring-blue-500/30",
-                    dateTaken || isFuture ? "border-amber-500/40" : "",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="grid place-items-center w-9 h-9 rounded-xl bg-zinc-900/40 border border-zinc-700/40 shrink-0">
-                      <CalendarIcon className="h-4 w-4 text-zinc-200" />
-                    </span>
-
-                    <div className="flex flex-col items-start leading-tight min-w-0">
-                      <span className="text-sm text-zinc-100 truncate w-full">{date}</span>
-                      <span className="text-xs text-zinc-400 truncate w-full">{toChicagoDisplayDate(date)}</span>
-                    </div>
-
-                    <span className="ml-auto text-xs text-zinc-400 shrink-0">Pick</span>
-                  </div>
-                </button>
-              </PopoverTrigger>
-
-              <PopoverContent
-                align="start"
-                side="bottom"
-                sideOffset={10}
-                className="z-[60] w-[min(360px,calc(100vw-2rem))] p-0 overflow-hidden rounded-2xl border border-zinc-700/60 bg-zinc-950/95 shadow-2xl backdrop-blur-xl"
-              >
-                <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
-                  <div className="text-xs text-zinc-300">Choose a date</div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDate(today);
-                      setDatePickerOpen(false);
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-white text-zinc-900 text-xs font-medium hover:bg-zinc-200 transition"
-                  >
-                    Today
-                  </button>
-                </div>
-
-                <Calendar
-                  mode="single"
-                  selected={selectedDateObj}
-                  onSelect={(d) => {
-                    if (!d) return;
-
-                    const iso = isoFromDate(d);
-
-                    if (d > todayDateObj) return;
-                    if (usedDates.has(iso)) return;
-
-                    setDate(iso);
-                    setDatePickerOpen(false);
-                  }}
-                  disabled={(d) => d > todayDateObj || usedDates.has(isoFromDate(d))}
-                  initialFocus
-                  className="p-3"
-                  classNames={{
-                    caption_label: "text-sm font-semibold text-zinc-100",
-                    head_cell: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
-                    day: "h-9 w-9 rounded-xl text-zinc-200 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30",
-                    day_selected: "bg-blue-600 text-white hover:bg-blue-600 focus:bg-blue-600",
-                    day_today: "border border-blue-500/50",
-                    day_outside: "text-zinc-600 opacity-40",
-                    day_disabled: "text-zinc-600 opacity-35",
-                    nav_button:
-                      "h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800",
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+            <DatePicker
+              date={date}
+              setDate={setDate}
+              today={today}
+              todayDateObj={todayDateObj}
+              usedDates={usedDates}
+              selectedDateObj={selectedDateObj}
+              dateTaken={dateTaken}
+              isFuture={isFuture}
+            />
 
             <div className="mt-2 text-xs text-zinc-500 flex flex-wrap items-center gap-2">
               {dateTaken && <span className="text-amber-400">Already entered for this date</span>}
@@ -815,22 +955,19 @@ export default function SalesPage() {
           </div>
 
           {/* Submit */}
-<div className="md:col-span-2">
-  {/* Spacer to align with the label row on desktop */}
-  <div className="h-[22px] mb-2 hidden md:block" />
-
-  <button
-    type="submit"
-    disabled={dateTaken || isFuture || adding}
-    className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 flex items-center justify-center gap-2"
-  >
-    {adding && (
-      <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
-    )}
-    Save
-  </button>
-</div>
-
+          <div className="md:col-span-2">
+            <div className="h-[22px] mb-2 hidden md:block" />
+            <button
+              type="submit"
+              disabled={dateTaken || isFuture || adding}
+              className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 flex items-center justify-center gap-2"
+            >
+              {adding && (
+                <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+              )}
+              Save
+            </button>
+          </div>
         </form>
 
         {err && (
@@ -873,9 +1010,7 @@ export default function SalesPage() {
           </select>
         </div>
 
-        <div className="mt-4">
-          {mobileView === "graphs" ? ChartsPanel : DataPanel}
-        </div>
+        <div className="mt-4">{mobileView === "graphs" ? ChartsPanel : DataPanel}</div>
       </section>
 
       {/* Desktop: charts LEFT, data RIGHT */}
