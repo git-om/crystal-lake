@@ -815,16 +815,22 @@ export default function SalesPage() {
           </div>
 
           {/* Submit */}
-          <div className="md:col-span-2 flex md:items-end">
-            <button
-              type="submit"
-              disabled={dateTaken || isFuture || adding}
-              className="w-full rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3.5 font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 flex items-center justify-center gap-2"
-            >
-              {adding && <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />}
-              Save
-            </button>
-          </div>
+<div className="md:col-span-2">
+  {/* Spacer to align with the label row on desktop */}
+  <div className="h-[22px] mb-2 hidden md:block" />
+
+  <button
+    type="submit"
+    disabled={dateTaken || isFuture || adding}
+    className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 flex items-center justify-center gap-2"
+  >
+    {adding && (
+      <span className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+    )}
+    Save
+  </button>
+</div>
+
         </form>
 
         {err && (
