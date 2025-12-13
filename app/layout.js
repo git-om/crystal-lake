@@ -1,6 +1,8 @@
+'use client'
+
 import "./globals.css";
 
-export const metadata = { title: "Crystal Lake" };
+// export const metadata = { title: "Crystal Lake" };
 
 export default function RootLayout({ children }) {
   return (
