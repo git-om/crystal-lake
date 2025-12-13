@@ -212,33 +212,44 @@ function DatePicker({
         </button>
       </div>
 
-      <Calendar
-        mode="single"
-        selected={selectedDateObj}
-        onSelect={(d) => {
-          if (!d) return;
+      <div className="bg-zinc-950/95">
+  <Calendar
+    mode="single"
+    selected={selectedDateObj}
+    onSelect={(d) => {
+      if (!d) return;
 
-          const iso = isoFromDate(d);
-          if (d > todayDateObj) return;
-          if (usedDates.has(iso)) return;
+      const iso = isoFromDate(d);
+      if (d > todayDateObj) return;
+      if (usedDates.has(iso)) return;
 
-          setDate(iso);
-          setOpen(false);
-        }}
-        disabled={(d) => d > todayDateObj || usedDates.has(isoFromDate(d))}
-        className="p-3"
-        classNames={{
-          caption_label: "text-sm font-semibold text-zinc-100",
-          head_cell: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
-          day: "h-9 w-9 rounded-xl text-zinc-200 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30",
-          day_selected: "bg-blue-600 text-white hover:bg-blue-600 focus:bg-blue-600",
-          day_today: "border border-blue-500/50",
-          day_outside: "text-zinc-600 opacity-40",
-          day_disabled: "text-zinc-600 opacity-35",
-          nav_button:
-            "h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800",
-        }}
-      />
+      setDate(iso);
+      setOpen(false);
+    }}
+    disabled={(d) => d > todayDateObj || usedDates.has(isoFromDate(d))}
+    className="p-3 !bg-transparent"
+    classNames={{
+      // ✅ force day-picker internals to not paint white
+      months: "bg-transparent",
+      month: "bg-transparent",
+      table: "w-full bg-transparent",
+      head_row: "bg-transparent",
+      row: "bg-transparent",
+      cell: "bg-transparent",
+
+      caption_label: "text-sm font-semibold text-zinc-100",
+      head_cell: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
+      day: "h-9 w-9 rounded-xl text-zinc-200 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30",
+      day_selected: "bg-blue-600 text-white hover:bg-blue-600 focus:bg-blue-600",
+      day_today: "border border-blue-500/50",
+      day_outside: "text-zinc-600 opacity-40",
+      day_disabled: "text-zinc-600 opacity-35",
+      nav_button:
+        "h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800",
+    }}
+  />
+</div>
+
     </>
   );
 
