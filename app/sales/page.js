@@ -12,7 +12,7 @@ import {
 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import {
   BarChart,
@@ -229,23 +229,16 @@ function DatePicker({
     disabled={(d) => d > todayDateObj || usedDates.has(isoFromDate(d))}
     className="p-3 !bg-transparent"
     classNames={{
-      // ✅ force day-picker internals to not paint white
-      months: "bg-transparent",
-      month: "bg-transparent",
-      table: "w-full bg-transparent",
-      head_row: "bg-transparent",
-      row: "bg-transparent",
-      cell: "bg-transparent",
-
+      month_grid: "w-full",
       caption_label: "text-sm font-semibold text-zinc-100",
-      head_cell: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
-      day: "h-9 w-9 rounded-xl text-zinc-200 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30",
-      day_selected: "bg-blue-600 text-white hover:bg-blue-600 focus:bg-blue-600",
-      day_today: "border border-blue-500/50",
-      day_outside: "text-zinc-600 opacity-40",
-      day_disabled: "text-zinc-600 opacity-35",
-      nav_button:
-        "h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800",
+      weekday: "text-zinc-400 rounded-md w-9 font-medium text-[0.75rem]",
+      today: "bg-blue-500/10 rounded-md data-[selected=true]:rounded-none",
+      outside: "text-zinc-600 opacity-40",
+      disabled: "text-zinc-600 opacity-35",
+      button_previous:
+        "inline-flex items-center justify-center h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800 p-0",
+      button_next:
+        "inline-flex items-center justify-center h-8 w-8 rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800 p-0",
     }}
   />
 </div>
@@ -268,6 +261,7 @@ function DatePicker({
         <DialogTrigger asChild>{TriggerButton}</DialogTrigger>
 
         <DialogContent
+          showCloseButton={false}
           className="
             p-0
             border border-zinc-700/60
@@ -280,9 +274,9 @@ function DatePicker({
             max-h-[calc(100dvh-1.25rem)]
             overflow-hidden
           "
-          // ✅ Avoid focus causing scroll-jumps on mobile
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
+          <DialogTitle className="sr-only">Pick a date</DialogTitle>
           <div className="max-h-[calc(100dvh-1.25rem)] overflow-y-auto overscroll-contain">
             {CalendarBody}
           </div>
@@ -451,13 +445,12 @@ export default function SalesPage() {
     const [meRes, salesRes] = await Promise.all([fetch("/api/me"), fetch("/api/sales")]);
 
     if (!meRes.ok) {
-      setErr("Not authenticated");
-      setLoading(false);
+      window.location.href = "/login";
       return;
     }
 
     const meData = await meRes.json();
-    const salesData = await salesRes.json();
+    const salesData = salesRes.ok ? await salesRes.json() : {};
 
     // list: newest first
     const rows = Array.isArray(salesData.sales) ? salesData.sales : [];
@@ -495,6 +488,10 @@ export default function SalesPage() {
 
     setErr("");
 
+    if (!sale.trim()) {
+      setErr("Please enter a sales amount.");
+      return;
+    }
     if (date > today) {
       setErr("Future dates are not allowed.");
       return;
@@ -970,7 +967,7 @@ export default function SalesPage() {
             <div className="h-[22px] mb-2 hidden md:block" />
             <button
               type="submit"
-              disabled={dateTaken || isFuture || adding}
+              disabled={dateTaken || isFuture || adding || !sale.trim()}
               className="w-full h-[52px] rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 font-medium hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30 flex items-center justify-center gap-2"
             >
               {adding && (

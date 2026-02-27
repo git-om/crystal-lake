@@ -28,7 +28,7 @@ async function main() {
     name: "Om",
     username: username.toLowerCase(),
     password: hashed,
-    isOwner: false,
+    isOwner: true,
   });
 
   console.log("Created owner:", owner.username);
