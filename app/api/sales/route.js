@@ -2,15 +2,39 @@ import { NextResponse } from "next/server";
 import { dbConnect } from "@/lib/db";
 import Sale from "@/models/Sale";
 import { requireUser } from "@/lib/auth";
-import { getChicagoTodayISO, isValidISODateString } from "@/lib/time";
+import { getChicagoTodayISO, isValidISODateString, nextMonthStart } from "@/lib/time";
 
-export async function GET() {
+export async function GET(req) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
+  const { searchParams } = new URL(req.url);
+  const page  = Math.max(1, parseInt(searchParams.get("page")  || "1",  10));
+  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
+  const month = searchParams.get("month") || "all"; // YYYY-MM or "all"
+
   await dbConnect();
-  const sales = await Sale.find().sort({ date: -1 });
-  return NextResponse.json({ sales, isOwner: user.isOwner });
+
+  const filter =
+    month !== "all"
+      ? { date: { $gte: `${month}-01`, $lt: nextMonthStart(month) } }
+      : {};
+
+  const [sales, total] = await Promise.all([
+    Sale.find(filter, { _id: 1, date: 1, sale: 1 })
+      .sort({ date: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    Sale.countDocuments(filter),
+  ]);
+
+  return NextResponse.json({
+    sales,
+    total,
+    pages:   Math.max(1, Math.ceil(total / limit)),
+    isOwner: user.isOwner,
+  });
 }
 
 export async function POST(req) {
